@@ -1,0 +1,13 @@
+apiVersion: 1
+
+contactPoints:
+  - orgId: 1
+    name: Postgres Webhook
+    receivers:
+      - uid: postgres_webhook_primary
+        type: webhook
+        settings:
+          url: http://webhook-api:3001/grafana/webhook
+          httpMethod: POST
+          authorization_scheme: Bearer
+          authorization_credentials: super-secret-token

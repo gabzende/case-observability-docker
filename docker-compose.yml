@@ -1,0 +1,77 @@
+services:
+  db:
+    image: postgres:16
+    container_name: case_db
+    environment:
+      POSTGRES_DB: case_study
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: admin123
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./db/init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+      - ./db/data:/docker-entrypoint-initdb.d/data:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d case_study"]
+      interval: 5s
+      timeout: 3s
+      retries: 15
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: case_grafana
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_SERVER_HTTP_PORT: 3000
+      GF_PATHS_PROVISIONING: /etc/grafana/provisioning
+      GF_INSTALL_PLUGINS: grafana-postgresql-datasource
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/etc/grafana/dashboards:ro
+
+  ingest-api:
+    build: ./ingest-api
+    container_name: case_ingest_api
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_NAME: case_study
+      DB_USER: postgres
+      DB_PASS: admin123
+      STATEMENT_TIMEOUT_MS: 5000
+      CONNECT_TIMEOUT_S: 5
+      DB_POOL_MIN: 1
+      DB_POOL_MAX: 10
+    ports:
+      - "3002:3002"
+
+  webhook-api:
+    build: ./webhook-api
+    container_name: case_webhook_api
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_NAME: case_study
+      DB_USER: postgres
+      DB_PASS: admin123
+      WEBHOOK_TOKEN: super-secret-token
+    ports:
+      - "3001:3001"
+
+volumes:
+  pgdata:
+  grafana_data:
