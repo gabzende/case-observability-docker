@@ -22,15 +22,24 @@ def get_conn():
 
 def parse_event_ts(payload: dict) -> datetime:
     alerts = payload.get("alerts", [])
-    if alerts:
-        starts_at = alerts[0].get("startsAt") or alerts[0].get("starts_at")
-        if starts_at:
-            try:
-                return datetime.fromisoformat(starts_at.replace("Z", "+00:00")).astimezone(
-                    timezone.utc
-                )
-            except Exception:
-                pass
+    if not alerts:
+        return datetime.now(timezone.utc)
+
+    alert = alerts[0]
+    status = (alert.get("status") or payload.get("status") or "").lower().strip()
+
+    ts_raw = None
+    if status == "resolved":
+        ts_raw = alert.get("endsAt") or alert.get("ends_at")
+    if not ts_raw:
+        ts_raw = alert.get("startsAt") or alert.get("starts_at")
+
+    if ts_raw:
+        try:
+            return datetime.fromisoformat(ts_raw.replace("Z", "+00:00")).astimezone(timezone.utc)
+        except Exception:
+            pass
+
     return datetime.now(timezone.utc)
 
 
@@ -60,6 +69,9 @@ async def grafana_webhook(
 
     raw_payload = json.dumps(payload)
 
+    reasons = []
+    severity_score = 0.0
+
     try:
         conn = get_conn()
         with conn:
@@ -82,21 +94,40 @@ async def grafana_webhook(
                       failed_mean, failed_std,
                       reversed_mean, reversed_std
                     FROM public.v_tx_anomaly
-                    WHERE ts = %s
+                    WHERE ts BETWEEN %s - interval '2 minutes' AND %s + interval '2 minutes'
+                    ORDER BY abs(extract(epoch FROM (ts - %s)))
+                    LIMIT 1
                     """,
-                    (bucket_ts,),
+                    (bucket_ts, bucket_ts, bucket_ts),
                 )
                 row = cur.fetchone()
 
                 if row:
-                    denied_flag, failed_flag, reversed_flag, total, approved, denied, failed, reversed, denied_rate, failed_rate, reversed_rate, denied_mean, denied_std, failed_mean, failed_std, reversed_mean, reversed_std = row
+                    (
+                        denied_flag,
+                        failed_flag,
+                        reversed_flag,
+                        total,
+                        approved,
+                        denied,
+                        failed,
+                        reversed,
+                        denied_rate,
+                        failed_rate,
+                        reversed_rate,
+                        denied_mean,
+                        denied_std,
+                        failed_mean,
+                        failed_std,
+                        reversed_mean,
+                        reversed_std,
+                    ) = row
                 else:
                     denied_flag = failed_flag = reversed_flag = False
                     total = approved = denied = failed = reversed = 0
                     denied_rate = failed_rate = reversed_rate = 0.0
                     denied_mean = denied_std = failed_mean = failed_std = reversed_mean = reversed_std = None
 
-                reasons = []
                 if denied_flag:
                     reasons.append("denied_above_normal")
                 if failed_flag:
@@ -150,12 +181,27 @@ async def grafana_webhook(
                       raw_payload = EXCLUDED.raw_payload
                     """,
                     (
-                        bucket_ts, state,
-                        denied_flag, failed_flag, reversed_flag,
-                        reasons, severity_score,
-                        total, approved, denied, failed, reversed,
-                        denied_rate, failed_rate, reversed_rate,
-                        denied_mean, denied_std, failed_mean, failed_std, reversed_mean, reversed_std,
+                        bucket_ts,
+                        state,
+                        denied_flag,
+                        failed_flag,
+                        reversed_flag,
+                        reasons,
+                        severity_score,
+                        total,
+                        approved,
+                        denied,
+                        failed,
+                        reversed,
+                        denied_rate,
+                        failed_rate,
+                        reversed_rate,
+                        denied_mean,
+                        denied_std,
+                        failed_mean,
+                        failed_std,
+                        reversed_mean,
+                        reversed_std,
                         raw_payload,
                     ),
                 )
