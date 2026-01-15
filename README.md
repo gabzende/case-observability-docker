@@ -1,4 +1,4 @@
-# Case 2 – Real-Time Transaction Monitoring and Alerting
+# Case – Real-Time Transaction Monitoring and Alerting
 
 ## Running the Project with Docker
 
