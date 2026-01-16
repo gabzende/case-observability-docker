@@ -62,6 +62,8 @@ This will stop and remove the containers while preserving volumes (unless explic
 
 ### Notes
 
+To login in Grafana use the credentials user: admin | password: admin
+
 All configuration values (database credentials, ports, webhook token) are provided via environment variables defined in `docker-compose.yml`.
 
 The project is designed to run entirely locally but can be adapted for cloud or CI environments with minimal changes.
@@ -121,7 +123,7 @@ Grafana is used for real-time visualization and alert evaluation.
 Dashboards provide visibility into transaction behavior and system health, including:
 - total transactions per minute
 - denied, failed, and reversed rates over time
-- anomaly indicators derived from SQL views
+- recent alerts table 
 - authorization code breakdowns for operational diagnosis
 
 ### Alerting
