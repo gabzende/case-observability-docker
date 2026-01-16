@@ -18,7 +18,6 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 4,
   "links": [],
   "panels": [
     {
@@ -144,7 +143,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT ts AS time, approved, denied, failed, reversed\r\nFROM public.v_tx_minute\r\nWHERE $__timeFilter(ts)\r\nORDER BY 1;\r\n",
+          "rawSql": "SELECT ts AS time, approved, denied, failed, reversed\nFROM public.v_tx_minute\nWHERE $__timeFilter(ts)\nORDER BY 1;\n",
           "refId": "A",
           "sql": {
             "columns": [
@@ -302,7 +301,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT\r\n  ts AS time,\r\n  SUM(count) FILTER (WHERE status = 'denied')::float / NULLIF(SUM(count), 0) * 100 AS denied_rate,\r\n  SUM(count) FILTER (WHERE status = 'failed')::float / NULLIF(SUM(count), 0) * 100 AS failed_rate,\r\n  SUM(count) FILTER (WHERE status IN ('reversed', 'backend_reversed'))::float / NULLIF(SUM(count), 0) * 100 AS reversed_rate\r\nFROM transactions\r\nGROUP BY ts\r\nORDER BY ts;",
+          "rawSql": "SELECT\n  ts AS \"time\",\n  denied_rate * 100 AS denied_rate,\n  failed_rate * 100 AS failed_rate,\n  reversed_rate * 100 AS reversed_rate\nFROM public.v_tx_minute\nWHERE $__timeFilter(ts)\nORDER BY ts;\n",
           "refId": "A",
           "sql": {
             "columns": [
@@ -381,7 +380,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT\r\n  created_at AS \"alert_time\",\r\n  CASE\r\n    WHEN 'denied_above_normal'   = ANY(reasons) THEN 'Denied rate anomaly'\r\n    WHEN 'failed_above_normal'   = ANY(reasons) THEN 'Failed rate anomaly'\r\n    WHEN 'reversed_above_normal' = ANY(reasons) THEN 'Reversed rate anomaly'\r\n    ELSE 'Resolved'\r\n  END AS \"trigger\"\r\nFROM public.transaction_alerts\r\nWHERE state = 'firing'\r\nORDER BY created_at DESC\r\nLIMIT 20;\r\n",
+          "rawSql": "SELECT\n  created_at AS \"alert_time\",\n  CASE\n    WHEN 'denied_above_normal'   = ANY(reasons) THEN 'Denied rate anomaly'\n    WHEN 'failed_above_normal'   = ANY(reasons) THEN 'Failed rate anomaly'\n    WHEN 'reversed_above_normal' = ANY(reasons) THEN 'Reversed rate anomaly'\n    ELSE 'Resolved'\n  END AS \"trigger\"\nFROM public.transaction_alerts\nWHERE state = 'firing'\nORDER BY created_at DESC\nLIMIT 20;\n",
           "refId": "A",
           "sql": {
             "columns": [
@@ -490,7 +489,7 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT\r\n  auth_code::text AS auth_code,\r\n  SUM(count) AS total\r\nFROM public.transactions_auth_codes\r\nWHERE $__timeFilter(ts)\r\nGROUP BY auth_code\r\nORDER BY total DESC\r\nLIMIT 10;\r\n",
+          "rawSql": "SELECT\n  auth_code::text AS auth_code,\n  SUM(count) AS total\nFROM public.transactions_auth_codes\nWHERE $__timeFilter(ts)\nGROUP BY auth_code\nORDER BY total DESC\nLIMIT 10;\n",
           "refId": "A",
           "sql": {
             "columns": [
@@ -513,86 +512,6 @@
       ],
       "title": "Auth Codes",
       "type": "barchart"
-    },
-    {
-      "datasource": {
-        "type": "grafana-postgresql-datasource",
-        "uid": "postgres"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": 0
-              },
-              {
-                "color": "red",
-                "value": 1
-              }
-            ]
-          },
-          "unit": "short"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 4,
-        "w": 24,
-        "x": 0,
-        "y": 16
-      },
-      "id": 4,
-      "options": {
-        "colorMode": "background",
-        "graphMode": "none",
-        "justifyMode": "auto",
-        "orientation": "auto",
-        "percentChangeColorMode": "standard",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "showPercentChange": false,
-        "textMode": "auto",
-        "wideLayout": true
-      },
-      "pluginVersion": "12.3.1",
-      "targets": [
-        {
-          "dataset": "case_study",
-          "editorMode": "code",
-          "format": "table",
-          "rawQuery": true,
-          "rawSql": "SELECT\r\n  ts AS time,\r\n  CASE WHEN denied_above_normal THEN 1 ELSE 0 END AS denied_alert,\r\n  CASE WHEN failed_above_normal THEN 1 ELSE 0 END AS failed_alert,\r\n  CASE WHEN reversed_above_normal THEN 1 ELSE 0 END AS reversed_alert\r\nFROM public.v_tx_anomaly\r\nWHERE $__timeFilter(ts)\r\nORDER BY ts DESC\r\nLIMIT 1;\r\n",
-          "refId": "A",
-          "sql": {
-            "columns": [
-              {
-                "parameters": [],
-                "type": "function"
-              }
-            ],
-            "groupBy": [
-              {
-                "property": {
-                  "type": "string"
-                },
-                "type": "groupBy"
-              }
-            ],
-            "limit": 50
-          }
-        }
-      ],
-      "title": "Alerts",
-      "type": "stat"
     }
   ],
   "preload": false,

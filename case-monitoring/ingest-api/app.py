@@ -194,6 +194,7 @@ def parse_iso_ts(ts_str: str) -> datetime:
     return dt.astimezone(timezone.utc)
 
 
+# NOTE: kept (unused) for compatibility; you can delete if you want
 def floor_to_minute_utc(dt: datetime) -> datetime:
     return dt.astimezone(timezone.utc).replace(second=0, microsecond=0)
 
@@ -208,43 +209,36 @@ def ingest_transaction(tx: Transaction):
     if tx.status not in ALLOWED_STATUSES:
         raise HTTPException(status_code=400, detail=f"Invalid status: {tx.status}")
 
-    bucket_ts = floor_to_minute_utc(event_ts)
-
     try:
         with get_db_connection() as conn:
             with conn.cursor() as cur:
-                # ✅ transactions: (ts, status, count)
+                # ✅ EVENT-BASED: one row per transaction (no bucketing, no upsert)
                 cur.execute(
                     """
                     INSERT INTO public.transactions (ts, status, count)
                     VALUES (%s, %s, 1)
-                    ON CONFLICT (ts, status)
-                    DO UPDATE SET count = public.transactions.count + 1
                     """,
-                    (bucket_ts, tx.status),
+                    (event_ts, tx.status),
                 )
 
-                # ✅ transactions_auth_codes: (ts, auth_code, count)
+                # ✅ EVENT-BASED: one row per auth_code event (count=1)
                 if tx.auth_code is not None:
                     cur.execute(
                         """
                         INSERT INTO public.transactions_auth_codes (ts, auth_code, count)
                         VALUES (%s, %s, 1)
-                        ON CONFLICT (ts, auth_code)
-                        DO UPDATE SET count = public.transactions_auth_codes.count + 1
                         """,
-                        (bucket_ts, tx.auth_code),
+                        (event_ts, tx.auth_code),
                     )
 
         return {
             "status": "ok",
-            "bucket_ts": bucket_ts.isoformat(),
+            "event_ts": event_ts.isoformat(),
             "status_sent": tx.status,
             "auth_code": tx.auth_code,
         }
 
     except psycopg2.Error as e:
-        # pgerror can be None sometimes
         msg = (e.pgerror or str(e)).strip()
         raise HTTPException(status_code=500, detail=f"Database error: {msg}")
     except Exception as e:
